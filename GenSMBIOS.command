@@ -61,7 +61,10 @@ class Smbios:
         for line in out.split("\n"):
             if not line.lower().startswith("version"):
                 continue
-            return next((x for x in line.lower().strip().split() if len(x) and x[0] in "0123456789"),None)
+            vers = next((x for x in line.lower().strip().split() if len(x) and x[0] in "0123456789"),None)
+            if not vers == None and vers[-1] == ".":
+                vers = vers[:-1]
+            return vers
         return None
 
     def _download_and_extract(self, temp, url):
@@ -82,6 +85,9 @@ class Smbios:
             if "macserial" in x.lower():
                 # Found one
                 print(" - Found {}".format(x))
+                if os.name != "nt":
+                    print("   - Chmod +x...")
+                    self.r.run({"args":["chmod","+x",os.path.join(btemp,x)]})
                 print("   - Copying to {} directory...".format(self.scripts))
                 if not os.path.exists(script_dir):
                     os.mkdir(script_dir)
@@ -264,7 +270,7 @@ class Smbios:
         smbios = self._get_smbios(macserial,smtype,times)
         if smbios == None:
             # Issues generating
-            print("Error - macserial returned an error:\n\n{}\n".format(err))
+            print("Error - macserial returned an error!")
             self.u.grab("Press [enter] to return...")
             return
         if smbios == False:
@@ -287,6 +293,7 @@ class Smbios:
             with open(self.plist, "wb") as f:
                 plist.dump(self.plist_data, f)
             # Got only valid keys now
+        print("")
         self.u.grab("Press [enter] to return...")
 
     def _list_current(self, macserial):
