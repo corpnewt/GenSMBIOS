@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# macserial anything
+macserial*
+
+# Hidden files
+.*
+
 # C extensions
 *.so
 
