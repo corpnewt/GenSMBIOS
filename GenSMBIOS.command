@@ -74,9 +74,7 @@ class Smbios:
         self.d.stream_to_file(url, os.path.join(ztemp,zfile), False)
         print(" - Extracting...")
         btemp = tempfile.mkdtemp(dir=temp)
-        os.chdir(os.path.join(temp,btemp))
         # Extract with built-in tools \o/
-        # self.r.run({"args":["unzip",os.path.join(ztemp,zfile)]})
         with zipfile.ZipFile(os.path.join(ztemp,zfile)) as z:
             z.extractall(os.path.join(temp,btemp))
         script_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),self.scripts)
