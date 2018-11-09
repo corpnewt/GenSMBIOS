@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import os, subprocess, shlex, datetime, sys, plistlib, tempfile, shutil, random, uuid, zipfile
 from Scripts import *
 # Python-aware urllib stuff
