@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 import os, subprocess, shlex, datetime, sys, plistlib, tempfile, shutil, random, uuid, zipfile
 from Scripts import *
 # Python-aware urllib stuff
@@ -180,6 +180,9 @@ class Smbios:
             else:
                 # Build our new SMBIOS
                 new_smbios[key] = key_check[key]
+        # We want the SmUUID to be the top-level - remove CustomUUID if exists
+        if "CustomUUID" in self.plist_data.get("SystemParameters",{}):
+            removed_keys.append("CustomUUID")
         if len(removed_keys):
             while True:
                 self.u.head("")
@@ -189,6 +192,8 @@ class Smbios:
                 if con.lower() == "y":
                     # Flush settings
                     self.plist_data["SMBIOS"] = new_smbios
+                    # Remove the CustomUUID if present
+                    self.plist_data.get("SystemParameters",{}).pop("CustomUUID", None)
                     break
                 elif con.lower() == "n":
                     self.plist_data = None
@@ -285,15 +290,15 @@ class Smbios:
             else:
                 print("\nFlushing SMBIOS entry to {}".format(self.plist))
             # Ensure plist data exists
-            if not "SMBIOS" in self.plist_data:
-                self.plist_data["SMBIOS"] = {}
-            if not "RtVariables" in self.plist_data:
-                self.plist_data["RtVariables"] = {}
+            for x in ["SMBIOS","RtVariables","SystemParameters"]:
+                if not x in self.plist_data:
+                    self.plist_data[x] = {}
             self.plist_data["SMBIOS"]["ProductName"] = smbios[0][0]
             self.plist_data["SMBIOS"]["SerialNumber"] = smbios[0][1]
             self.plist_data["SMBIOS"]["BoardSerialNumber"] = smbios[0][2]
             self.plist_data["RtVariables"]["MLB"] = smbios[0][2]
             self.plist_data["SMBIOS"]["SmUUID"] = smbios[0][3]
+            self.plist_data["SystemParameters"]["InjectSystemID"] = True
             with open(self.plist, "wb") as f:
                 plist.dump(self.plist_data, f)
             # Got only valid keys now
