@@ -102,13 +102,17 @@ class Smbios:
             self.u.grab("Press [enter] to return...")
             return
         macurl,winurl = urls[0],urls[1]
-        print(" - MacURL: {}\n - WinURL: {}\n".format(macurl,winurl))
+        # print(" - MacURL: {}\n - WinURL: {}\n".format(macurl,winurl))
         # Download the zips
         temp = tempfile.mkdtemp()
         cwd = os.getcwd()
         try:
-            self._download_and_extract(temp,macurl)
-            self._download_and_extract(temp,winurl)
+            if os.name != "nt":
+                print(" - MacURL: {}\n".format(macurl))
+                self._download_and_extract(temp,macurl)
+            else:
+                print(" - WinURL: {}\n".format(winurl))
+                self._download_and_extract(temp,winurl)
         except Exception as e:
             print("We ran into some problems :(\n\n{}".format(e))
         print("Cleaning up...")
