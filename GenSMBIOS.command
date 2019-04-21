@@ -12,7 +12,7 @@ class Smbios:
         self.u = utils.Utils("GenSMBIOS")
         self.d = downloader.Downloader()
         self.r = run.Run()
-        self.url = "https://github.com/acidanthera/macserial/releases/latest"
+        self.url = "https://github.com/acidanthera/MacInfoPkg/releases/latest"
         self.scripts = "Scripts"
         self.plist = None
         self.plist_data = None
