@@ -79,7 +79,6 @@ class Smbios:
             z.extractall(os.path.join(temp,btemp))
         script_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),self.scripts)
         for x in os.listdir(os.path.join(temp,btemp)):
-            print(x)
             if "macserial" in x.lower():
                 # Found one
                 print(" - Found {}".format(x))
