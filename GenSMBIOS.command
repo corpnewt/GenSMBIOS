@@ -16,6 +16,7 @@ class Smbios:
         self.scripts = "Scripts"
         self.plist = None
         self.plist_data = None
+        self.plist_type = "Unknown" # Can be "Clover" or "OpenCore" depending
         self.remote = self._get_remote_version()
         self.okay_keys = [
             "SerialNumber",
@@ -140,6 +141,7 @@ class Smbios:
         self.u.head("Select Plist")
         print("")
         print("Current: {}".format(self.plist))
+        print("Type:    {}".format(self.plist_type))
         print("")
         print("C. Clear Selection")
         print("M. Main Menu")
@@ -162,7 +164,7 @@ class Smbios:
             print("Plist file not found:\n\n{}".format(p))
             print("")
             self.u.grab("Press [enter] to return...")
-            self._get_plist()
+            return self._get_plist()
         try:
             with open(pc, "rb") as f:
                 self.plist_data = plist.load(f)
@@ -172,35 +174,58 @@ class Smbios:
             print("Plist file malformed:\n\n{}".format(e))
             print("")
             self.u.grab("Press [enter] to return...")
-            self._get_plist()
-        # Got a valid plist - let's check keys
-        key_check = self.plist_data.get("SMBIOS",{})
-        new_smbios = {}
-        removed_keys = []
-        for key in key_check:
-            if key not in self.okay_keys:
-                removed_keys.append(key)
-            else:
-                # Build our new SMBIOS
-                new_smbios[key] = key_check[key]
-        # We want the SmUUID to be the top-level - remove CustomUUID if exists
-        if "CustomUUID" in self.plist_data.get("SystemParameters",{}):
-            removed_keys.append("CustomUUID")
-        if len(removed_keys):
+            return self._get_plist()
+        # Got a valid plist - let's try to check for Clover or OC structure
+        detected_type = "OpenCore" if "PlatformInfo" in self.plist_data else "Clover" if "SMBIOS" in self.plist_data else "Unknown"
+        if detected_type.lower() == "unknown":
+            # Have the user decide which to do
             while True:
-                self.u.head("")
+                self.u.head("Unknown Plist Type")
                 print("")
-                print("The following keys will be removed:\n\n{}\n".format(", ".join(removed_keys)))
-                con = self.u.grab("Continue? (y/n):  ")
-                if con.lower() == "y":
-                    # Flush settings
-                    self.plist_data["SMBIOS"] = new_smbios
-                    # Remove the CustomUUID if present
-                    self.plist_data.get("SystemParameters",{}).pop("CustomUUID", None)
+                print("Could not auto-determine plist type!")
+                print("")
+                print("1. Clover")
+                print("2. OpenCore")
+                print("")
+                print("M. Return to the Menu")
+                print("")
+                t = self.u.grab("Please select the target type:  ").lower()
+                if t == "m": return self._get_plist()
+                elif t in ("1","2"):
+                    detected_type = "Clover" if t == "1" else "OpenCore"
                     break
-                elif con.lower() == "n":
-                    self.plist_data = None
-                    return
+        # Got a plist and type - let's save it
+        self.plist_type = detected_type
+        # Apply any key-stripping or safety checks
+        if self.plist_type.lower() == "clover":
+            # Got a valid clover plist - let's check keys
+            key_check = self.plist_data.get("SMBIOS",{})
+            new_smbios = {}
+            removed_keys = []
+            for key in key_check:
+                if key not in self.okay_keys:
+                    removed_keys.append(key)
+                else:
+                    # Build our new SMBIOS
+                    new_smbios[key] = key_check[key]
+            # We want the SmUUID to be the top-level - remove CustomUUID if exists
+            if "CustomUUID" in self.plist_data.get("SystemParameters",{}):
+                removed_keys.append("CustomUUID")
+            if len(removed_keys):
+                while True:
+                    self.u.head("")
+                    print("")
+                    print("The following keys will be removed:\n\n{}\n".format(", ".join(removed_keys)))
+                    con = self.u.grab("Continue? (y/n):  ")
+                    if con.lower() == "y":
+                        # Flush settings
+                        self.plist_data["SMBIOS"] = new_smbios
+                        # Remove the CustomUUID if present
+                        self.plist_data.get("SystemParameters",{}).pop("CustomUUID", None)
+                        break
+                    elif con.lower() == "n":
+                        self.plist_data = None
+                        return
         self.plist = pc
 
     def _get_smbios(self, macserial, smbios_type, times=1):
@@ -292,16 +317,26 @@ class Smbios:
                 print("\nFlushing first SMBIOS entry to {}".format(self.plist))
             else:
                 print("\nFlushing SMBIOS entry to {}".format(self.plist))
-            # Ensure plist data exists
-            for x in ["SMBIOS","RtVariables","SystemParameters"]:
-                if not x in self.plist_data:
-                    self.plist_data[x] = {}
-            self.plist_data["SMBIOS"]["ProductName"] = smbios[0][0]
-            self.plist_data["SMBIOS"]["SerialNumber"] = smbios[0][1]
-            self.plist_data["SMBIOS"]["BoardSerialNumber"] = smbios[0][2]
-            self.plist_data["RtVariables"]["MLB"] = smbios[0][2]
-            self.plist_data["SMBIOS"]["SmUUID"] = smbios[0][3]
-            self.plist_data["SystemParameters"]["InjectSystemID"] = True
+            if self.plist_type.lower() == "clover":
+                # Ensure plist data exists
+                for x in ["SMBIOS","RtVariables","SystemParameters"]:
+                    if not x in self.plist_data:
+                        self.plist_data[x] = {}
+                self.plist_data["SMBIOS"]["ProductName"] = smbios[0][0]
+                self.plist_data["SMBIOS"]["SerialNumber"] = smbios[0][1]
+                self.plist_data["SMBIOS"]["BoardSerialNumber"] = smbios[0][2]
+                self.plist_data["RtVariables"]["MLB"] = smbios[0][2]
+                self.plist_data["SMBIOS"]["SmUUID"] = smbios[0][3]
+                self.plist_data["SystemParameters"]["InjectSystemID"] = True
+            elif self.plist_type.lower() == "opencore":
+                # Ensure data exists
+                if not "PlatformInfo" in self.plist_data: self.plist_data["PlatformInfo"] = {}
+                if not "Generic" in self.plist_data["PlatformInfo"]: self.plist_data["PlatformInfo"]["Generic"] = {}
+                # Set the values
+                self.plist_data["PlatformInfo"]["Generic"]["SystemProductName"] = smbios[0][0]
+                self.plist_data["PlatformInfo"]["Generic"]["SystemSerialNumber"] = smbios[0][1]
+                self.plist_data["PlatformInfo"]["Generic"]["MLB"] = smbios[0][2]
+                self.plist_data["PlatformInfo"]["Generic"]["SystemUUID"] = smbios[0][3]
             with open(self.plist, "wb") as f:
                 plist.dump(self.plist_data, f)
             # Got only valid keys now
@@ -341,6 +376,7 @@ class Smbios:
         if self.remote and self.u.compare_versions(macserial_v, self.remote):
             print("Remote Version v{}".format(self.remote))
         print("Current plist: {}".format(self.plist))
+        print("Plist type:    {}".format(self.plist_type))
         print("")
         print("1. Install/Update MacSerial")
         print("2. Select config.plist")
