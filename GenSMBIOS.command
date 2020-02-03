@@ -42,7 +42,7 @@ class Smbios:
 
     def _get_binary(self,binary_name=None):
         if not binary_name:
-            return None
+            binary_name = "macserial32.exe" if os.name == "nt" else "macserial"
         # Check locally
         cwd = os.getcwd()
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
@@ -259,12 +259,18 @@ class Smbios:
 
     def _generate_smbios(self, macserial):
         if not macserial or not os.path.exists(macserial):
-            self.u.head("Missing MacSerial")
-            print("")
-            print("MacSerial binary not found.")
-            print("")
-            self.u.grab("Press [enter] to return...")
-            return
+            # Attempt to download
+            self._get_macserial()
+            # Check it again
+            macserial = self._get_binary()
+            if not macserial or not os.path.exists(macserial):
+                # Could not find it, and it failed to download :(
+                self.u.head("Missing MacSerial")
+                print("")
+                print("MacSerial binary was not found and failed to download.")
+                print("")
+                self.u.grab("Press [enter] to return...")
+                return
         self.u.head("Generate SMBIOS")
         print("")
         print("M. Main Menu")
@@ -362,10 +368,7 @@ class Smbios:
     def main(self):
         self.u.head()
         print("")
-        if os.name == "nt":
-            macserial = self._get_binary("macserial32.exe")
-        else:
-            macserial = self._get_binary("macserial")
+        macserial = self._get_binary()
         if macserial:
             macserial_v = self._get_version(macserial)
             print("MacSerial v{}".format(macserial_v))
