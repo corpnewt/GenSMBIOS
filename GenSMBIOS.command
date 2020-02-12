@@ -31,14 +31,15 @@ class Smbios:
         # Get the latest version of macserial
         try:
             urlsource = self.d.get_string(self.url,False)
-            versions = [[y for y in x.split('"') if ".zip" in y and "download" in y] for x in urlsource.lower().split("\n") if ("mac.zip" in x or "win32.zip" in x) and "download" in x]
+            versions = [[y for y in x.split('"') if ".zip" in y and "download" in y] for x in urlsource.lower().split("\n") if any(y in x for y in ("mac.zip","win32.zip","linux.zip")) and "download" in x]
             versions = [x[0] for x in versions]
             mac_version = next(("https://github.com" + x for x in versions if "mac.zip" in x),None)
             win_version = next(("https://github.com" + x for x in versions if "win32.zip" in x),None)
+            lin_version = next(("https://github.com" + x for x in versions if "linux.zip" in x),None)
         except:
             # Not valid data
             return None
-        return (mac_version,win_version)
+        return (mac_version,win_version,lin_version)
 
     def _get_binary(self,binary_name=None):
         if not binary_name:
@@ -97,28 +98,28 @@ class Smbios:
         print("")
         print("Gathering latest macserial info...")
         urls = self._get_macserial_url()
-        if not urls:
+        if not urls or not len(urls)==3:
             print("Error checking for updates (network issue)\n")
             self.u.grab("Press [enter] to return...")
             return
-        macurl,winurl = urls[0],urls[1]
-        # print(" - MacURL: {}\n - WinURL: {}\n".format(macurl,winurl))
+        systems = {
+            "darwin": ["MacURL",urls[0]],
+            "win32":  ["WindowsURL",urls[1]],
+            "linux":  ["LinuxURL",urls[2]]
+        }
         # Download the zips
         temp = tempfile.mkdtemp()
         cwd = os.getcwd()
         try:
-            if os.name != "nt":
-                print(" - MacURL: {}\n".format(macurl))
-                self._download_and_extract(temp,macurl)
-            else:
-                print(" - WinURL: {}\n".format(winurl))
-                self._download_and_extract(temp,winurl)
+            current = systems[sys.platform]
+            print(" - {}: {}\n".format(*current))
+            self._download_and_extract(temp,current[1])
         except Exception as e:
             print("We ran into some problems :(\n\n{}".format(e))
-        print("Cleaning up...")
+        print("\nCleaning up...")
         os.chdir(cwd)
         shutil.rmtree(temp)
-        self.u.grab("Done.",timeout=5)
+        self.u.grab("\nDone.",timeout=5)
         return
 
     def _get_remote_version(self):
