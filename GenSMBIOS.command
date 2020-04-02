@@ -111,7 +111,8 @@ class Smbios:
         temp = tempfile.mkdtemp()
         cwd = os.getcwd()
         try:
-            current = systems[sys.platform]
+            system = "linux" if sys.platform.lower().startsiwth("linux") else sys.platform
+            current = systems[system]
             print(" - {}: {}\n".format(*current))
             self._download_and_extract(temp,current[1])
         except Exception as e:
