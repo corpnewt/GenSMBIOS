@@ -111,7 +111,7 @@ class Smbios:
         temp = tempfile.mkdtemp()
         cwd = os.getcwd()
         try:
-            system = "linux" if sys.platform.lower().startsiwth("linux") else sys.platform
+            system = "linux" if sys.platform.lower().startswith("linux") else sys.platform
             current = systems[system]
             print(" - {}: {}\n".format(*current))
             self._download_and_extract(temp,current[1])
