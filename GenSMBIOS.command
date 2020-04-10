@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os, subprocess, shlex, datetime, sys, plistlib, tempfile, shutil, random, uuid, zipfile
 from Scripts import *
+from collections import OrderedDict
 # Python-aware urllib stuff
 if sys.version_info >= (3, 0):
     from urllib.request import urlopen
@@ -169,7 +170,7 @@ class Smbios:
             return self._get_plist()
         try:
             with open(pc, "rb") as f:
-                self.plist_data = plist.load(f)
+                self.plist_data = plist.load(f,dict_type=OrderedDict)
         except Exception as e:
             self.u.head("Plist Malformed")
             print("")
@@ -346,7 +347,7 @@ class Smbios:
                 self.plist_data["PlatformInfo"]["Generic"]["MLB"] = smbios[0][2]
                 self.plist_data["PlatformInfo"]["Generic"]["SystemUUID"] = smbios[0][3]
             with open(self.plist, "wb") as f:
-                plist.dump(self.plist_data, f)
+                plist.dump(self.plist_data, f, sort_keys=False)
             # Got only valid keys now
         print("")
         self.u.grab("Press [enter] to return...")
