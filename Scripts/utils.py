@@ -7,6 +7,11 @@ else:
     # Not Windows \o/
     import select
 
+try:
+    raw_input
+except NameError:
+    raw_input = input
+
 class Utils:
 
     def __init__(self, name = "Python Script"):
