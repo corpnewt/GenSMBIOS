@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, subprocess, shlex, datetime, sys, plistlib, tempfile, shutil, random, uuid, zipfile
+import os, subprocess, shlex, datetime, sys, plistlib, tempfile, shutil, random, uuid, zipfile, json
 from Scripts import *
 from collections import OrderedDict
 # Python-aware urllib stuff
@@ -13,7 +13,8 @@ class Smbios:
         self.u = utils.Utils("GenSMBIOS")
         self.d = downloader.Downloader()
         self.r = run.Run()
-        self.url = "https://github.com/acidanthera/MacInfoPkg/releases/latest"
+        self.macinfopkg_url = "https://api.github.com/repos/acidanthera/MacInfoPkg/releases"
+        self.opencorpgk_url = "https://api.github.com/repos/acidanthera/OpenCorePkg/releases"
         self.scripts = "Scripts"
         self.plist = None
         self.plist_data = None
@@ -28,31 +29,53 @@ class Smbios:
             "Memory"
         ]
 
+    def _get_macserial_version(self):
+        # Attempts to determine the macserial version from the latest OpenCorPkg
+        try:
+            urlsource = json.loads(self.d.get_string(self.opencorpgk_url,False))
+            macserial_h_url = "https://raw.githubusercontent.com/acidanthera/OpenCorePkg/{}/Utilities/macserial/macserial.h".format(urlsource[0]["target_commitish"])
+            macserial_h = self.d.get_string(macserial_h_url,False)
+            macserial_v = macserial_h.split('#define PROGRAM_VERSION "')[1].split('"')[0]
+        except: return None
+        return macserial_v
+
     def _get_macserial_url(self):
+        # Gets a url to the latest version of OpenCorePkg
+        try:
+            urlsource = json.loads(self.d.get_string(self.opencorpgk_url,False))
+            return next((x.get("browser_download_url",None) for x in urlsource[0].get("assets",[]) if "RELEASE.zip" in x.get("name","")),None)
+        except: pass
+        return None
+
+    def _get_macserial_version_linux(self):
         # Get the latest version of macserial
         try:
-            urlsource = self.d.get_string(self.url,False)
-            versions = [[y for y in x.split('"') if ".zip" in y and "download" in y] for x in urlsource.lower().split("\n") if any(y in x for y in ("mac.zip","win32.zip","linux.zip")) and "download" in x]
-            versions = [x[0] for x in versions]
-            mac_version = next(("https://github.com" + x for x in versions if "mac.zip" in x),None)
-            win_version = next(("https://github.com" + x for x in versions if "win32.zip" in x),None)
-            lin_version = next(("https://github.com" + x for x in versions if "linux.zip" in x),None)
-        except:
-            # Not valid data
-            return None
-        return (mac_version,win_version,lin_version)
+            urlsource = json.loads(self.d.get_string(self.macinfopkg_url,False))
+            return urlsource[0].get("tag_name",None)
+        except: pass # Not valid data
+        return None
+
+    def _get_macserial_url_linux(self):
+        # Get the latest url of macserial - we'll leverage this for linux users
+        try:
+            urlsource = json.loads(self.d.get_string(self.macinfopkg_url,False))
+            return next((x.get("browser_download_url",None) for x in urlsource[0].get("assets",[]) if "linux.zip" in x.get("name","")),None)
+        except: pass # Not valid data
+        return None
 
     def _get_binary(self,binary_name=None):
         if not binary_name:
-            binary_name = "macserial32.exe" if os.name == "nt" else "macserial"
+            binary_name = ("macserial.exe","macserial32.exe") if os.name == "nt" else ("macserial")
         # Check locally
         cwd = os.getcwd()
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
         path = None
-        if os.path.exists(binary_name):
-            path = os.path.join(os.getcwd(), binary_name)
-        elif os.path.exists(os.path.join(os.getcwd(), self.scripts, binary_name)):
-            path = os.path.join(os.getcwd(),self.scripts,binary_name)
+        for name in binary_name:
+            if os.path.exists(name):
+                path = os.path.join(os.getcwd(), name)
+            elif os.path.exists(os.path.join(os.getcwd(), self.scripts, name)):
+                path = os.path.join(os.getcwd(),self.scripts,name)
+            if path: break # Found it, bail
         os.chdir(cwd)
         return path
 
@@ -70,7 +93,7 @@ class Smbios:
             return vers
         return None
 
-    def _download_and_extract(self, temp, url):
+    def _download_and_extract(self, temp, url, path_in_zip=[]):
         ztemp = tempfile.mkdtemp(dir=temp)
         zfile = os.path.basename(url)
         print("Downloading {}...".format(os.path.basename(url)))
@@ -81,41 +104,42 @@ class Smbios:
         with zipfile.ZipFile(os.path.join(ztemp,zfile)) as z:
             z.extractall(os.path.join(temp,btemp))
         script_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),self.scripts)
-        for x in os.listdir(os.path.join(temp,btemp)):
+        search_path = os.path.join(temp,btemp)
+        # Extend the search path if path_in_zip contains elements
+        if path_in_zip: search_path = os.path.join(search_path,*path_in_zip)
+        for x in os.listdir(search_path):
             if "macserial" in x.lower():
                 # Found one
                 print(" - Found {}".format(x))
                 if os.name != "nt":
                     print("   - Chmod +x...")
-                    self.r.run({"args":["chmod","+x",os.path.join(btemp,x)]})
+                    self.r.run({"args":["chmod","+x",os.path.join(search_path,x)]})
                 print("   - Copying to {} directory...".format(self.scripts))
                 if not os.path.exists(script_dir):
                     os.mkdir(script_dir)
-                shutil.copy(os.path.join(btemp,x), os.path.join(script_dir,x))
+                shutil.copy(os.path.join(search_path,x), os.path.join(script_dir,x))
 
     def _get_macserial(self):
         # Download both the windows and mac versions of macserial and expand them to the Scripts dir
         self.u.head("Getting MacSerial")
         print("")
         print("Gathering latest macserial info...")
-        urls = self._get_macserial_url()
-        if not urls or not len(urls)==3:
+        # Check if Linux - as that only gets the old version
+        if sys.platform.startswith("linux"):
+            url = self._get_macserial_url_linux()
+            path_in_zip = []
+        else:
+            url = self._get_macserial_url()
+            path_in_zip = ["Utilities","macserial"]
+        if not url:
             print("Error checking for updates (network issue)\n")
             self.u.grab("Press [enter] to return...")
             return
-        systems = {
-            "darwin": ["MacURL",urls[0]],
-            "win32":  ["WindowsURL",urls[1]],
-            "linux":  ["LinuxURL",urls[2]]
-        }
-        # Download the zips
         temp = tempfile.mkdtemp()
-        cwd = os.getcwd()
+        cwd  = os.getcwd()
         try:
-            system = "linux" if sys.platform.lower().startswith("linux") else sys.platform
-            current = systems[system]
-            print(" - {}: {}\n".format(*current))
-            self._download_and_extract(temp,current[1])
+            print(" - {}".format(url))
+            self._download_and_extract(temp,url,path_in_zip)
         except Exception as e:
             print("We ran into some problems :(\n\n{}".format(e))
         print("\nCleaning up...")
@@ -128,17 +152,17 @@ class Smbios:
         self.u.head("Getting MacSerial Remote Version")
         print("")
         print("Gathering latest macserial info...")
-        urls = self._get_macserial_url()
-        if not urls:
+        if sys.platform.startswith("linux"):
+            print(" - Running on Linux, limited to v2.1.2")
+            vers = self._get_macserial_version_linux()
+        else:
+            print(" - Gathering info from OpenCorePkg...")
+            vers = self._get_macserial_version()
+        if not vers:
             print("Error checking for updates (network issue)\n")
             self.u.grab("Press [enter] to return...")
             return None
-        try:
-            return urls[0].split("/")[7]
-        except:
-            print("Error parsing update url\n")
-            self.u.grab("Press [enter] to return...")
-            return None
+        return vers
 
     def _get_plist(self):
         self.u.head("Select Plist")
