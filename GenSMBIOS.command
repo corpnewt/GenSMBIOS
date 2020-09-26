@@ -65,7 +65,7 @@ class Smbios:
 
     def _get_binary(self,binary_name=None):
         if not binary_name:
-            binary_name = ("macserial.exe","macserial32.exe") if os.name == "nt" else ("macserial")
+            binary_name = ["macserial.exe","macserial32.exe"] if os.name == "nt" else ["macserial"]
         # Check locally
         cwd = os.getcwd()
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
