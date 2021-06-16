@@ -13,7 +13,6 @@ class Smbios:
         self.u = utils.Utils("GenSMBIOS")
         self.d = downloader.Downloader()
         self.r = run.Run()
-        self.macinfopkg_url = "https://api.github.com/repos/acidanthera/MacInfoPkg/releases"
         self.opencorpgk_url = "https://api.github.com/repos/acidanthera/OpenCorePkg/releases"
         self.scripts = "Scripts"
         self.plist = None
@@ -47,25 +46,9 @@ class Smbios:
         except: pass
         return None
 
-    def _get_macserial_version_linux(self):
-        # Get the latest version of macserial
-        try:
-            urlsource = json.loads(self.d.get_string(self.macinfopkg_url,False))
-            return urlsource[0].get("tag_name",None)
-        except: pass # Not valid data
-        return None
-
-    def _get_macserial_url_linux(self):
-        # Get the latest url of macserial - we'll leverage this for linux users
-        try:
-            urlsource = json.loads(self.d.get_string(self.macinfopkg_url,False))
-            return next((x.get("browser_download_url",None) for x in urlsource[0].get("assets",[]) if "linux.zip" in x.get("name","")),None)
-        except: pass # Not valid data
-        return None
-
     def _get_binary(self,binary_name=None):
         if not binary_name:
-            binary_name = ["macserial.exe","macserial32.exe"] if os.name == "nt" else ["macserial"]
+            binary_name = ["macserial.exe","macserial32.exe"] if os.name == "nt" else ["macserial.linux","macserial"] if sys.platform.startswith("linux") else ["macserial"]
         # Check locally
         cwd = os.getcwd()
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
@@ -124,13 +107,8 @@ class Smbios:
         self.u.head("Getting MacSerial")
         print("")
         print("Gathering latest macserial info...")
-        # Check if Linux - as that only gets the old version
-        if sys.platform.startswith("linux"):
-            url = self._get_macserial_url_linux()
-            path_in_zip = []
-        else:
-            url = self._get_macserial_url()
-            path_in_zip = ["Utilities","macserial"]
+        url = self._get_macserial_url()
+        path_in_zip = ["Utilities","macserial"]
         if not url:
             print("Error checking for updates (network issue)\n")
             self.u.grab("Press [enter] to return...")
@@ -152,12 +130,8 @@ class Smbios:
         self.u.head("Getting MacSerial Remote Version")
         print("")
         print("Gathering latest macserial info...")
-        if sys.platform.startswith("linux"):
-            print(" - Running on Linux, limited to v2.1.2")
-            vers = self._get_macserial_version_linux()
-        else:
-            print(" - Gathering info from OpenCorePkg...")
-            vers = self._get_macserial_version()
+        print(" - Gathering info from OpenCorePkg...")
+        vers = self._get_macserial_version()
         if not vers:
             print("Error checking for updates (network issue)\n")
             self.u.grab("Press [enter] to return...")
