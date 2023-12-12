@@ -14,7 +14,7 @@ class Smbios:
         self.u = utils.Utils("GenSMBIOS")
         self.d = downloader.Downloader()
         self.r = run.Run()
-        self.opencorpgk_url = "https://api.github.com/repos/acidanthera/OpenCorePkg/releases"
+        self.oc_release_url = "https://github.com/acidanthera/OpenCorePkg/releases/latest"
         self.scripts = "Scripts"
         self.plist = None
         self.plist_data = None
@@ -33,21 +33,34 @@ class Smbios:
         self.gen_rom = True        
 
     def _get_macserial_version(self):
-        # Attempts to determine the macserial version from the latest OpenCorPkg
+        # Attempts to determine the macserial version from the latest OpenCorePkg
+        macserial_v = None
         try:
-            urlsource = json.loads(self.d.get_string(self.opencorpgk_url,False))
-            macserial_h_url = "https://raw.githubusercontent.com/acidanthera/OpenCorePkg/{}/Utilities/macserial/macserial.h".format(urlsource[0]["target_commitish"])
-            macserial_h = self.d.get_string(macserial_h_url,False)
-            macserial_v = macserial_h.split('#define PROGRAM_VERSION "')[1].split('"')[0]
-        except: return None
+            urlsource = self.d.get_string(self.oc_release_url, False)
+            for line in urlsource.split("\n"):
+                if "expanded_assets" in line:
+                    # Get the version from the URL
+                    oc_vers = line.split(' src="')[1].split('"')[0].split("/")[-1]
+                    macserial_h_url = "https://raw.githubusercontent.com/acidanthera/OpenCorePkg/{}/Utilities/macserial/macserial.h".format(oc_vers)
+                    macserial_h = self.d.get_string(macserial_h_url,False)
+                    macserial_v = macserial_h.split('#define PROGRAM_VERSION "')[1].split('"')[0]
+        except:
+            pass
         return macserial_v
 
     def _get_macserial_url(self):
-        # Gets a url to the latest version of OpenCorePkg
+        # Gets a URL to the latest release of OpenCorePkg
         try:
-            urlsource = json.loads(self.d.get_string(self.opencorpgk_url,False))
-            return next((x.get("browser_download_url",None) for x in urlsource[0].get("assets",[]) if "RELEASE.zip" in x.get("name","")),None)
-        except: pass
+            urlsource = self.d.get_string(self.oc_release_url, False)
+            for line in urlsource.split("\n"):
+                if "expanded_assets" in line:
+                    expanded_html = self.d.get_string(line.split(' src="')[1].split('"')[0], False)
+                    for l in expanded_html.split("\n"):
+                        if 'href="/acidanthera/OpenCorePkg/releases/download/' in l and "-RELEASE.zip" in l:
+                            # Got it
+                            return "https://github.com{}".format(l.split('href="')[1].split('"')[0])
+        except:
+            pass
         return None
 
     def _get_binary(self,binary_name=None):
