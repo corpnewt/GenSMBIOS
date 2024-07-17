@@ -96,8 +96,11 @@ class Smbios:
     def _download_and_extract(self, temp, url, path_in_zip=[]):
         ztemp = tempfile.mkdtemp(dir=temp)
         zfile = os.path.basename(url)
-        print("Downloading {}...".format(os.path.basename(url)))
-        self.d.stream_to_file(url, os.path.join(ztemp,zfile), False)
+        print("\nDownloading {}...".format(os.path.basename(url)))
+        result = self.d.stream_to_file(url, os.path.join(ztemp,zfile))
+        print("")
+        if not result:
+            raise Exception(" - Failed to download!")
         print(" - Extracting...")
         btemp = tempfile.mkdtemp(dir=temp)
         # Extract with built-in tools \o/
