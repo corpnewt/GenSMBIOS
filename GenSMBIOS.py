@@ -453,13 +453,14 @@ class Smbios:
         elif menu == "7":
             self.gen_rom = not self.gen_rom
 
-s = Smbios()
-while True:
-    try:
-        s.main()
-    except Exception as e:
-        print(e)
-        if sys.version_info >= (3, 0):
-            input("Press [enter] to return...")
-        else:
-            raw_input("Press [enter] to return...")
+if __name__ == "__main__":
+    s = Smbios()
+    while True:
+        try:
+            s.main()
+        except Exception as e:
+            print(e)
+            if sys.version_info >= (3, 0):
+                input("Press [enter] to return...")
+            else:
+                raw_input("Press [enter] to return...")
