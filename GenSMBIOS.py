@@ -1,12 +1,17 @@
 #!/usr/bin/env python
-import os, subprocess, shlex, datetime, sys, plistlib, tempfile, shutil, random, uuid, zipfile, json, binascii, shlex
-from Scripts import *
+import os, subprocess, shlex, sys, tempfile, shutil, random, uuid, zipfile, json, binascii
+from Scripts import downloader, plist, run, utils
 from collections import OrderedDict
-# Python-aware urllib stuff
-if sys.version_info >= (3, 0):
-    from urllib.request import urlopen
-else:
-    from urllib2 import urlopen
+# Import from secrets - or fall back on random.SystemRandom()
+# functions if on python 2
+try:
+    from secrets import randbits, choice
+    basestring = str
+except ImportError:
+    from random import SystemRandom
+    _sysrand = SystemRandom()
+    randbits = _sysrand.getrandbits
+    choice   = _sysrand.choice
 
 class Smbios:
     def __init__(self):
@@ -265,8 +270,13 @@ class Smbios:
         self.plist = pc
 
     def _get_rom(self):
-        rom_str = random.choice(self.rom_prefixes) if self.rom_prefixes else ""
-        while len(rom_str) < 12: rom_str += random.choice("0123456789ABCDEF")
+        # Generate 6-bytes of cryptographically random values
+        rom_str = "{:x}".format(randbits(8*6)).upper().rjust(12,"0")
+        if self.rom_prefixes:
+            # Replace the prefix with one from our list
+            prefix = choice(self.rom_prefixes)
+            if isinstance(prefix,basestring):
+                rom_str = prefix+rom_str[len(prefix):]
         return rom_str
 
     def _get_smbios(self, macserial, smbios_type, times=1):
@@ -274,7 +284,7 @@ class Smbios:
         total = []
         # Get any additional args and ensure they're a string
         args = self.settings.get("macserial_args")
-        if not isinstance(args,str): args = ""
+        if not isinstance(args,basestring): args = ""
         while len(total) < times:
             total_len = len(total)
             smbios, err, code = self.r.run({"args":[macserial,"-a"]+shlex.split(args)})
@@ -362,7 +372,7 @@ class Smbios:
             return
         self.u.head("{} SMBIOS Info".format(smbios[0][0]))
         print("")
-        if self.settings.get("macserial_args") and isinstance(self.settings["macserial_args"],str):
+        if self.settings.get("macserial_args") and isinstance(self.settings["macserial_args"],basestring):
             print("Additional Arguments Passed:")
             print(" {}".format(self.settings["macserial_args"]))
             print("")
@@ -427,7 +437,7 @@ class Smbios:
             print("")
             print("Current Additional Arguments:")
             args = self.settings.get("macserial_args")
-            if not args or not isinstance(args,str): args = None
+            if not args or not isinstance(args,basestring): args = None
             print(" {}".format(args))
             print("")
             print("The -a argument is always passed to macserial, but you can enter additional")
@@ -475,7 +485,7 @@ class Smbios:
         print("6. List Current SMBIOS")
         print("7. Generate ROM With SMBIOS (Currently {})".format("Enabled" if self.gen_rom else "Disabled"))
         args = self.settings.get("macserial_args")
-        if not args or not isinstance(args,str): args = None
+        if not args or not isinstance(args,basestring): args = None
         print("8. Additional Args (Currently: {})".format(args))
         print("")
         print("Q. Quit")
