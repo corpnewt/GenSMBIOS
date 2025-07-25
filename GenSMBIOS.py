@@ -617,30 +617,39 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="GenSMBIOS CLI")
     parser.add_argument(
-        "--install", action="store_true", help="Install/Update MacSerial"
+        "-i", "--install", action="store_true", help="Install/Update MacSerial"
     )
-    parser.add_argument("--plist", type=str, help="Path to config.plist")
+    parser.add_argument("-p", "--plist", type=str, help="Path to config.plist")
     parser.add_argument(
+        "-t",
         "--plist-type",
         choices=["clover", "opencore"],
         help="Specify plist type if not auto-detected",
     )
     parser.add_argument(
+        "-g",
         "--generate",
         nargs="+",
         help="Generate SMBIOS: <type> [times] (e.g., iMac18,3 5)",
     )
-    parser.add_argument("--uuid", action="store_true", help="Generate UUID")
-    parser.add_argument("--rom", action="store_true", help="Generate ROM")
-    parser.add_argument("--list", action="store_true", help="List current SMBIOS")
+    parser.add_argument("-u", "--uuid", action="store_true", help="Generate UUID")
+    parser.add_argument("-r", "--rom", action="store_true", help="Generate ROM")
+    parser.add_argument("-l", "--list", action="store_true", help="List current SMBIOS")
     parser.add_argument(
         "--toggle-rom", action="store_true", help="Toggle generate ROM with SMBIOS"
     )
-    parser.add_argument("--args", type=str, help="Set additional args for macserial")
     parser.add_argument(
-        "--clear-args", action="store_true", help="Clear additional args for macserial"
+        "-a", "--args", type=str, help="Set additional args for macserial"
     )
-    parser.add_argument("--version", action="store_true", help="Show MacSerial version")
+    parser.add_argument(
+        "-c",
+        "--clear-args",
+        action="store_true",
+        help="Clear additional args for macserial",
+    )
+    parser.add_argument(
+        "-v", "--version", action="store_true", help="Show MacSerial version"
+    )
     parser.add_argument(
         "-j", "--json", type=str, help="Export generated SMBIOS to JSON file"
     )
@@ -690,17 +699,14 @@ if __name__ == "__main__":
                 print("Removed keys from plist: {}".format(", ".join(removed_keys)))
             s.plist_data["SMBIOS"] = new_smbios
         s.plist = pc
-        processed = True
 
     if args.clear_args:
         s.settings.pop("macserial_args", None)
         s._save_settings()
-        processed = True
 
     if args.args is not None:
         s.settings["macserial_args"] = args.args
         s._save_settings()
-        processed = True
 
     if args.toggle_rom:
         s.gen_rom = not s.gen_rom
@@ -709,7 +715,6 @@ if __name__ == "__main__":
                 "Enabled" if s.gen_rom else "Disabled"
             )
         )
-        processed = True
 
     if args.generate:
         macserial = s._get_binary()
