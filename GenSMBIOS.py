@@ -294,7 +294,12 @@ class Smbios:
             # Got our text, let's see if the SMBIOS exists
             for line in smbios.split("\n"):
                 line = line.strip()
-                if line.lower().startswith(smbios_type.lower()):
+                try:
+                    line_smbios = line.split()[0]
+                    assert line_smbios != "ERROR:"
+                except:
+                    continue
+                if line_smbios.lower() == smbios_type.lower():
                     total.append(line)
                     if len(total) >= times:
                         break
