@@ -421,18 +421,98 @@ class Smbios:
         self.u.grab("Press [enter] to return...")
 
     def _list_current(self, macserial):
-        if not macserial or not os.path.exists(macserial):
-            self.u.head("Missing MacSerial")
+        self.u.head("Current SMBIOS Info")
+        print("")
+        
+        # Check if we have a plist selected
+        if not self.plist or not self.plist_data:
+            print("No plist selected.")
             print("")
-            print("MacSerial binary not found.")
+            print("Please select a config.plist first (option 2).")
             print("")
             self.u.grab("Press [enter] to return...")
             return
-        out, err, code = self.r.run({"args":[macserial]})
-        out = "\n".join([x for x in out.split("\n") if not x.lower().startswith("version") and len(x)])
-        self.u.head("Current SMBIOS Info")
-        print("")
-        print(out)
+        
+        # Try to read SMBIOS values from the plist
+        smbios_info = []
+        
+        if self.plist_type.lower() == "opencore":
+            # OpenCore structure
+            platform_info = self.plist_data.get("PlatformInfo", {})
+            generic = platform_info.get("Generic", {})
+            
+            product_name = generic.get("SystemProductName", "Not Set")
+            serial = generic.get("SystemSerialNumber", "Not Set")
+            mlb = generic.get("MLB", "Not Set")
+            uuid = generic.get("SystemUUID", "Not Set")
+            rom_data = generic.get("ROM")
+            
+            # Decode ROM if it's base64 data
+            rom_str = "Not Set"
+            if rom_data:
+                try:
+                    # ROM is stored as binary data, extract and convert to hex
+                    rom_bytes = plist.extract_data(rom_data)
+                    if isinstance(rom_bytes, bytes):
+                        rom_str = binascii.hexlify(rom_bytes).decode("utf-8").upper()
+                except:
+                    rom_str = "Not Set"
+            
+            smbios_info = [
+                ("Type", product_name),
+                ("Serial", serial),
+                ("Board Serial", mlb),
+                ("SmUUID", uuid),
+                ("Apple ROM", rom_str)
+            ]
+            
+        elif self.plist_type.lower() == "clover":
+            # Clover structure
+            smbios = self.plist_data.get("SMBIOS", {})
+            rt_vars = self.plist_data.get("RtVariables", {})
+            
+            product_name = smbios.get("ProductName", "Not Set")
+            serial = smbios.get("SerialNumber", "Not Set")
+            board_serial = smbios.get("BoardSerialNumber", "Not Set")
+            mlb = rt_vars.get("MLB", board_serial if board_serial != "Not Set" else "Not Set")
+            uuid = smbios.get("SmUUID", "Not Set")
+            rom_data = rt_vars.get("ROM")
+            
+            # Decode ROM if it's base64 data
+            rom_str = "Not Set"
+            if rom_data:
+                try:
+                    # ROM is stored as binary data, extract and convert to hex
+                    rom_bytes = plist.extract_data(rom_data)
+                    if isinstance(rom_bytes, bytes):
+                        rom_str = binascii.hexlify(rom_bytes).decode("utf-8").upper()
+                except:
+                    rom_str = "Not Set"
+            
+            smbios_info = [
+                ("Type", product_name),
+                ("Serial", serial),
+                ("Board Serial", mlb),
+                ("SmUUID", uuid),
+                ("Apple ROM", rom_str)
+            ]
+        else:
+            print("Unknown plist type: {}".format(self.plist_type))
+            print("")
+            self.u.grab("Press [enter] to return...")
+            return
+        
+        # Display the SMBIOS info
+        if any(value != "Not Set" for _, value in smbios_info):
+            # Format output similar to macserial output
+            max_label_len = max(len(label) for label, _ in smbios_info)
+            for label, value in smbios_info:
+                print("{}: {}".format(label.ljust(max_label_len), value))
+        else:
+            print("No SMBIOS values found in plist.")
+            print("")
+            print("Generate SMBIOS values first (option 3).")
+        
         print("")
         self.u.grab("Press [enter] to return...")
 
