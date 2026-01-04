@@ -432,7 +432,13 @@ class Smbios:
         out = "\n".join([x for x in out.split("\n") if not x.lower().startswith("version") and len(x)])
         self.u.head("Current SMBIOS Info")
         print("")
-        print(out)
+        if out:
+            print(out)
+        else:
+            print("Nothing was returned for the currently running system.")
+            if not sys.platform.lower() == "darwin":
+                print("\nGiven that macserial gathers its information from the IODeviceTree, this can")
+                print("only be done on macOS.")
         print("")
         self.u.grab("Press [enter] to return...")
 
